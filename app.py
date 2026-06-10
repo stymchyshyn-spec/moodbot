@@ -1,198 +1,119 @@
-pip install streamlit langgraph langchain langchain-google-genai langchain-community python-dotenv google-genai
-!pip install -q langchain-mistralai
-from langchain_mistralai.chat_models import ChatMistralAI
-
-llm = ChatMistralAI(
-    api_key="xzlx0f7OB4hMiCol0IDNconlKuOkuy8B",
-    model="mistral-large-latest"
-)
 import streamlit as st
-import pandas as pd
-from datetime import datetime, timedelta
 import uuid
-st.set_page_config(page_title="MoodBot", layout="wide")
-st.markdown("""
-<style>
-.stApp {
-    background: linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%);
-}
-.mood-card {
-    background: white;
-    padding: 1rem;
-    border-radius: 10px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-</style>
-""", unsafe_allow_html=True)
+from datetime import datetime
+from agent import run_agent
+
+st.set_page_config(page_title="MoodBot AI", layout="wide")
+
+st.title("🌸 MoodBot AI")
+
+# ---------------- STATE ----------------
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
 if "mood_log" not in st.session_state:
     st.session_state.mood_log = []
-
-if "selected_mood" not in st.session_state:
-    st.session_state.selected_mood = None
-
-if "show_note_input" not in st.session_state:
-    st.session_state.show_note_input = False
-if "messages" not in st.session_state:
-    st.session_state.messages = [
-        {
-            "role": "assistant",
-            "content": "Привіт! Я MoodBot. Скажи, як ти сьогодні почуваєшся?"
-        }
-    ]
 
 if "thread_id" not in st.session_state:
     st.session_state.thread_id = str(uuid.uuid4())
 
-if "settings" not in st.session_state:
-    st.session_state.settings = {
-        "mode": "chat",
-        "temperature": 0.7,
-        "max_tokens": 500
-    }
-st.sidebar.title("Налаштування MoodBot")
+if "mode" not in st.session_state:
+    st.session_state.mode = "chat"
 
-mode = st.sidebar.selectbox(
-    "Режим роботи",
-    ["chat", "agent"]
-)
-st.session_state.settings["mode"] = mode
+# ---------------- SIDEBAR ----------------
+with st.sidebar:
+    st.header("⚙️ Режим")
 
-temperature = st.sidebar.slider(
-    "Температура",
-    0.0, 1.0, 0.7, 0.1
-)
-st.session_state.settings["temperature"] = temperature
-
-max_tokens = st.sidebar.slider(
-    "Max tokens",
-    100, 2000, 500, 100
-)
-st.session_state.settings["max_tokens"] = max_tokens
-
-if st.sidebar.button("Очистити історію"):
-    st.session_state.messages = []
-    st.session_state.mood_log = []
-    st.session_state.thread_id = str(uuid.uuid4())
-    st.sidebar.success("Очищено!")
-
-
-st.sidebar.info(
-    f"""
-  MoodBot
-
-Режим: {st.session_state.settings['mode']}
-Thread: {st.session_state.thread_id}
-"""
-)
-st.title("🌸 Щоденник настрою")
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
-
-user_input = st.chat_input("Напиши, як ти себе почуваєш.")
-if user_input:
-
-    st.session_state.messages.append(
-        {"role": "user", "content": user_input}
+    st.session_state.mode = st.selectbox(
+        "Вибір режиму",
+        ["chat", "agent"]
     )
 
-    if mode == "chat":
-        assistant_response = f"💬 Chat: {user_input}"
-    else:
-        assistant_response = run_agent(
-            user_input,
-            st.session_state.thread_id
-        )
+    if st.button("🧹 Очистити"):
+        st.session_state.messages = []
+        st.session_state.mood_log = []
 
-    st.session_state.messages.append(
-        {"role": "assistant", "content": assistant_response}
-    )
+    st.info(f"Thread: {st.session_state.thread_id}")
 
-    st.rerun()
+# ---------------- CHAT HISTORY ----------------
+for m in st.session_state.messages:
+    with st.chat_message(m["role"]):
+        st.write(m["content"])
 
-mood_cols = st.columns(5)
+# ---------------- INPUT ----------------
+msg = st.chat_input("Напиши щось...")
 
-moods = [
-    ("😊", "Радість", 5),
-    ("😌", "Спокій", 4),
-    ("😐", "Нейтрально", 3),
-    ("😔", "Сум", 2),
-    ("😰", "Тривога", 1)
-]
+if msg:
+    st.session_state.messages.append({"role": "user", "content": msg})
 
-for i, (emoji, name, value) in enumerate(moods):
-    with mood_cols[i]:
-        if st.button(emoji, key=f"mood_{i}"):
-            st.session_state.selected_mood = {
-                "emoji": emoji,
-                "name": name,
-                "value": value
-            }
-            st.session_state.show_note_input = True
-if st.session_state.show_note_input:
-    note = st.text_area(
-        f"Додай думки до настрою {st.session_state.selected_mood['emoji']}"
-    )
+    # ---------------- CHAT MODE (як GPT) ----------------
+    if st.session_state.mode == "chat":
 
-    if st.button("💾 Зберегти"):
+        text = msg.lower()
+
+        if "погано" in text:
+            response = "💙 Мені шкода, що ти так почуваєшся. Я з тобою."
+            mood_value = 1
+
+        elif "стрес" in text:
+            response = "🌿 Спробуй глибоко подихати. Я поруч."
+            mood_value = 2
+
+        elif "привіт" in text:
+            response = "👋 Привіт! Як ти сьогодні?"
+            mood_value = 4
+
+        else:
+            response = "💬 Розкажи більше, я тебе слухаю."
+            mood_value = 3
+
         st.session_state.mood_log.append({
-            "timestamp": str(datetime.now()),
-            "mood": st.session_state.selected_mood["name"],
-            "value": st.session_state.selected_mood["value"],
-            "note": note
+            "time": datetime.now(),
+            "value": mood_value
         })
 
-        st.session_state.show_note_input = False
-        st.success("Збережено 💜")
-        st.rerun()
-st.divider()
-st.subheader("📊 Графік настрою")
+    # ---------------- AGENT MODE ----------------
+    else:
+        response = run_agent(msg, st.session_state.thread_id)
 
-if len(st.session_state.mood_log) >= 2:
+    st.session_state.messages.append({"role": "assistant", "content": response})
+    st.rerun()
+
+# ---------------- MOOD BUTTONS ----------------
+st.divider()
+st.subheader("😊 Обери настрій")
+
+cols = st.columns(5)
+
+moods = [
+    ("😊", 5),
+    ("🙂", 4),
+    ("😐", 3),
+    ("😔", 2),
+    ("😢", 1)
+]
+
+for i, (emoji, value) in enumerate(moods):
+    with cols[i]:
+        if st.button(emoji):
+            st.session_state.mood_log.append({
+                "time": datetime.now(),
+                "value": value
+            })
+            st.success("Збережено!")
+
+# ---------------- MOOD CHART ----------------
+st.divider()
+st.subheader("📊 Твій настрій")
+
+if len(st.session_state.mood_log) > 1:
     import pandas as pd
 
     df = pd.DataFrame(st.session_state.mood_log)
-    df["date"] = pd.to_datetime(df["timestamp"]).dt.date
-    chart_data = df.groupby("date")["value"].mean()
+    df["date"] = pd.to_datetime(df["time"]).dt.date
 
-    st.line_chart(chart_data)
+    chart = df.groupby("date")["value"].mean()
+
+    st.line_chart(chart)
 else:
-    st.info("Потрібно мінімум 2 записи")
-@st.cache_resource
-def get_llm():
-    return ChatMistralAI(
-        model="mistral-large-latest",
-        api_key=os.getenv("MISTRAL_API_KEY"),
-        temperature=st.session_state.settings["temperature"]
-    )
-def build_chat_history():
-    history = []
-
-    for msg in st.session_state.messages:
-        history.append(
-            {
-                "role": msg["role"],
-                "content": msg["content"]
-            }
-        )
-
-    return history
-def stream_response(user_message):
-    llm = get_llm()
-
-    response = llm.stream(user_message)
-
-    for chunk in response:
-        if chunk.content:
-            yield chunk.content
-def run_agent(user_message):
-
-    thread_id = st.session_state.thread_id
-
-    response = (
-        f"Agent mode\n"
-        f"Thread ID: {thread_id}\n\n"
-        f"Повідомлення: {user_message}"
-    )
-
-    return response
+    st.info("Потрібно хоча б 2 записи")
