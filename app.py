@@ -22,8 +22,14 @@ msg = st.chat_input("Напиши щось")
 if msg:
     st.session_state.messages.append({"role": "user", "content": msg})
 
-    if st.session_state.mode == "chat":
-        response = f"💬 Chat: {msg}"
+if st.session_state.mode == "chat":
+      
+    if any(word in msg.lower() for word in ["настрій", "як ти", "як справи"]):
+        response = "💜 Як ти себе сьогодні почуваєш?"
+    else:
+        response = f"Я тебе слухаю 💙"
+else:
+    response = run_agent(msg)
     else:
         response = run_agent(msg)
 
