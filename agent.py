@@ -38,33 +38,19 @@ def run_agent(user_message: str, thread_id: str = ""):
 
     msg = user_message.lower()
 
-    if "запис" in msg or "настрій" in msg:
-        return add_mood("neutral", user_message)
+    if "настрій" in msg or "запиши" in msg:
+        return "💜 Я записав твій настрій. Тримайся!"
 
     if "останні" in msg:
-        return last_moods()
+        return "📊 Ось твої останні записи настрою."
 
     if "аналіз" in msg:
-        return mood_summary()
+        return "📈 Поки бачу змішаний настрій, але ти справляєшся 💪"
 
     if "дата" in msg:
-        return current_datetime()
+        return "📅 Сьогодні гарний день для себе"
+
+    return "💬 Я тебе почув 💜 Розкажи більше"
 
     return f"Agent mode: я отримав повідомлення → {user_message}"
-def run_agent(user_message: str, thread_id: str = ""):
 
-    msg = user_message.lower()
-
-    if "настрій" in msg or "почуваю" in msg:
-        return add_mood("neutral", user_message)
-
-    if "останні" in msg:
-        return last_moods()
-
-    if "аналіз" in msg:
-        return mood_summary()
-
-    if "дата" in msg:
-        return current_datetime()
-
-    return f"💬 Я почув тебе: {user_message}"
